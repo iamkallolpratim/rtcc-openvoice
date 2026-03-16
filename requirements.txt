@@ -1,0 +1,20 @@
+# Core ML framework
+torch>=2.0.0
+torchaudio>=2.0.0
+
+# Audio I/O
+soundfile>=0.12.1
+librosa>=0.10.0
+
+# Numerics (usually installed as transitive deps, listed explicitly for clarity)
+numpy>=1.24.0
+
+# OpenVoice extra deps (install these via: pip install -r OpenVoice/requirements.txt)
+# Listed here for reference:
+#   transformers
+#   inflect
+#   unidecode
+#   whisper-timestamped  (only needed for VAD-based SE extraction)
+
+# Standard library modules used (no install needed):
+#   argparse, os, sys, tempfile

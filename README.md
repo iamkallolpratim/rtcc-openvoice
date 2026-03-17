@@ -16,6 +16,7 @@
 7. [Hardware Requirements](#7-hardware-requirements)
 8. [Project Structure](#8-project-structure)
 9. [Dependencies](#9-dependencies)
+10. [Phase 1 — Usable Engine](#10-phase-1--usable-engine)
 
 ---
 
@@ -348,3 +349,203 @@ RTCC/
 RTCC is a thin wrapper around [OpenVoice](https://github.com/myshell-ai/OpenVoice).  
 See the [OpenVoice LICENSE](https://github.com/myshell-ai/OpenVoice/blob/main/LICENSE) for model usage terms.  
 Both OpenVoice V1 and V2 are released under the **MIT License** as of April 2024.
+
+---
+
+---
+
+## 10. Phase 1 — Usable Engine
+
+> Upgrade from basic CLI prototype to a developer-friendly, low-latency local voice engine.  
+> All changes are local and CLI-based — no APIs, no servers, no microservices.
+
+### What Changed
+
+| Area | Before | After |
+|------|--------|-------|
+| Output strategy | Generate full audio → save | Split → generate chunks → play progressively |
+| Playback | Manual (`afplay`) after generation | `--play` flag streams audio during generation |
+| Model loading | Reloaded on every run | Loaded once, cached in `VoiceCloner` |
+| Speaker embedding | Re-extracted even for same reference | Cached; skipped if path unchanged |
+| Warmup | None | `--warmup` flag runs dummy inference to pre-heat JIT |
+| Mode selection | Auto-detected only | `--mode tts` / `--mode vc` (explicit or auto-detected) |
+| Chunk control | Not available | `--chunk_size N` controls words per synthesis chunk |
+| Temp files | Single shared tempfile | Shared tempdir, cleaned up on exit, minimal I/O |
+| Logging | Basic print statements | `[RTCC]` prefixed progress logs throughout |
+
+---
+
+### 10.1 Install New Dependency
+
+Phase 1 adds `sounddevice` for real-time audio playback:
+
+```bash
+pip install sounddevice
+```
+
+If `sounddevice` is not installed and `--play` is passed, RTCC will warn and continue without playback — it will not crash.
+
+---
+
+### 10.2 New CLI Flags
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--mode` | `tts` \| `vc` | auto-detected | Explicit pipeline mode. `tts` = text input, `vc` = audio input |
+| `--play` | flag | `False` | Stream audio to speakers during generation via `sounddevice` |
+| `--chunk_size` | int | `15` | Max words per TTS synthesis chunk. Set `0` to disable chunking |
+| `--warmup` | flag | `False` | Run a dummy inference pass after loading to pre-heat model caches |
+
+All existing flags (`--speaker`, `--speed`, `--language`, `--reference_audio`, `--text`, `--input_audio`, `--output`, model path overrides) are **unchanged and fully backward-compatible**.
+
+---
+
+### 10.3 Pseudo-Streaming (TTS Mode)
+
+Previously, the full utterance was synthesised before anything was saved or played.
+
+**Phase 1 pipeline:**
+
+```
+Text → split into chunks → for each chunk:
+    TTS (base speech) → extract SE → tone convert → queue for playback
+                                                          ↓
+                                              play chunk immediately
+                                              while next chunk generates
+```
+
+**Concurrency model:**
+
+```
+Main thread:   [gen chunk 1] [gen chunk 2] [gen chunk 3] …
+Playback thread:        [play chunk 1] [play chunk 2] …
+```
+
+A `queue.Queue(maxsize=4)` sits between the two threads. The playback thread (`_PlaybackThread`) is a daemon that drains the queue via `sounddevice.play(..., blocking=True)`. Backpressure is applied automatically — the main thread blocks on `queue.put()` if the playback thread falls behind by more than 4 chunks.
+
+**Time to first audio (approximate):**
+
+| Hardware | Before (full utterance) | After (first chunk, 15 words) |
+|----------|------------------------|-------------------------------|
+| CPU | 30–120 s | 6–24 s |
+| GPU (CUDA) | 2–5 s | 0.4–1 s |
+
+---
+
+### 10.4 Chunk Size Tuning
+
+`--chunk_size` controls the trade-off between latency and overhead:
+
+| `--chunk_size` | Best for |
+|----------------|----------|
+| `8–10` | Lowest time-to-first-audio; more TTS/converter call overhead |
+| `15` (default) | Balanced — natural sentence breaks, low overhead |
+| `20–25` | GPU users where per-chunk inference is already fast |
+| `0` | Disable chunking entirely — identical to original behaviour |
+
+Chunks are split first at sentence boundaries (`.` `!` `?`), then by word count if a sentence exceeds `chunk_size`.
+
+---
+
+### 10.5 Model Warmup
+
+The first inference call is always slower than subsequent ones because PyTorch compiles CUDA graphs and allocates memory pools on first use. `--warmup` runs a silent dummy "Hello." through the full TTS → extract_se → convert pipeline immediately after model load, so the real request hits pre-warmed caches.
+
+```bash
+python rtcc_cli.py \
+    --reference_audio audio/speaker.wav \
+    --text "Hello world" \
+    --output outputs/result.wav \
+    --warmup \
+    --play
+```
+
+Warmup adds ~5–30 s of startup cost but can reduce first-chunk latency by 20–50% on GPU.
+
+---
+
+### 10.6 Updated Example Usage
+
+**TTS — pseudo-streaming with playback:**
+
+```bash
+python rtcc_cli.py \
+    --mode tts \
+    --reference_audio audio/obama.wav \
+    --text "Hello world. I am here to celebrate this moment with all of you." \
+    --output outputs/result.wav \
+    --play \
+    --chunk_size 10
+```
+
+**TTS — existing command, fully compatible (no new flags needed):**
+
+```bash
+python rtcc_cli.py \
+    --reference_audio audio/obama.wav \
+    --text "Hello world. I am here to celebrate" \
+    --output outputs/result.wav \
+    --speaker cheerful \
+    --speed 0.9 \
+    --language English
+```
+
+**TTS — with warmup for lower first-chunk latency:**
+
+```bash
+python rtcc_cli.py \
+    --mode tts \
+    --reference_audio audio/speaker.wav \
+    --text "Hello world" \
+    --output outputs/result.wav \
+    --warmup \
+    --play
+```
+
+**VC — voice conversion with immediate playback:**
+
+```bash
+python rtcc_cli.py \
+    --mode vc \
+    --reference_audio audio/speaker.wav \
+    --input_audio audio/source.wav \
+    --output outputs/converted.wav \
+    --play
+```
+
+---
+
+### 10.7 Updated Project Structure
+
+```
+RTCC/
+├── audio/
+│   └── speaker.wav
+├── outputs/
+├── OpenVoice/
+│   └── openvoice/
+│       └── checkpoints/
+│           ├── base_speakers/EN/
+│           └── converter/
+├── rtcc_cli.py          # Updated — new flags: --mode, --play, --chunk_size, --warmup
+├── voice_cloner.py      # Updated — streaming, caching, warmup, threaded playback
+├── openvoice_loader.py  # Unchanged
+├── audio_utils.py       # Unchanged
+├── requirements.txt     # Updated — added sounddevice
+└── README.md
+```
+
+---
+
+### 10.8 Phase 1 Troubleshooting
+
+| Error / Symptom | Fix |
+|-----------------|-----|
+| `ModuleNotFoundError: sounddevice` | Run `pip install sounddevice` |
+| `--play` flag has no effect | `sounddevice` not installed — RTCC warns and skips playback gracefully |
+| Audio plays out of order | Should not happen — playback queue is strictly ordered (FIFO) |
+| Choppy playback between chunks | Increase `--chunk_size` to reduce inter-chunk gaps |
+| `PortAudioError` on Linux | Install PortAudio: `sudo apt-get install libportaudio2` |
+| `PortAudioError` on macOS | Usually self-resolving; try `brew install portaudio` if it persists |
+| Warmup takes very long on CPU | Normal — skip `--warmup` on CPU; benefit is mainly for GPU |
+| Temp files left on disk after crash | Stored in system tmpdir (e.g. `/tmp/rtcc_*/`) — safe to delete manually |

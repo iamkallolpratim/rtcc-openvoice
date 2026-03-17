@@ -549,3 +549,28 @@ RTCC/
 | `PortAudioError` on macOS | Usually self-resolving; try `brew install portaudio` if it persists |
 | Warmup takes very long on CPU | Normal — skip `--warmup` on CPU; benefit is mainly for GPU |
 | Temp files left on disk after crash | Stored in system tmpdir (e.g. `/tmp/rtcc_*/`) — safe to delete manually |
+
+## Optional UI (Gradio)
+
+A minimal browser interface is available as a developer convenience.
+
+**Install the extra dependency (not required for CLI use):**
+```bash
+pip install gradio
+```
+
+**Launch:**
+```bash
+python gradio_app.py
+```
+
+Open `http://localhost:7860` in your browser.
+
+### Supported modes
+
+| Mode | Inputs | Output |
+|------|--------|--------|
+| Text to Voice | Reference audio + text | Cloned speech WAV |
+| Audio to Voice | Reference audio + input audio | Voice-converted WAV |
+
+> The UI is a thin wrapper over `VoiceCloner` — no duplicated logic, no extra dependencies in core requirements.

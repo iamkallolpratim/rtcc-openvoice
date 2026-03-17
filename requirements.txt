@@ -1,20 +1,65 @@
-# Core ML framework
-torch>=2.0.0
-torchaudio>=2.0.0
-
-# Audio I/O
-soundfile>=0.12.1
-librosa>=0.10.0
-
-# Numerics (usually installed as transitive deps, listed explicitly for clarity)
-numpy>=1.24.0
-
-# OpenVoice extra deps (install these via: pip install -r OpenVoice/requirements.txt)
-# Listed here for reference:
-#   transformers
-#   inflect
-#   unidecode
-#   whisper-timestamped  (only needed for VAD-based SE extraction)
-
-# Standard library modules used (no install needed):
-#   argparse, os, sys, tempfile
+annotated-doc==0.0.4
+anyio==4.12.1
+audioread==3.1.0
+certifi==2026.2.25
+cffi==2.0.0
+charset-normalizer==3.4.6
+click==8.3.1
+cn2an==0.5.23
+decorator==5.2.1
+eng_to_ipa==0.0.2
+faster-whisper==0.9.0
+filelock==3.25.2
+fsspec==2026.2.0
+h11==0.16.0
+hf-xet==1.4.2
+httpcore==1.0.9
+httpx==0.28.1
+huggingface_hub==1.7.1
+idna==3.11
+inflect==7.5.0
+jieba==0.42.1
+Jinja2==3.1.6
+joblib==1.5.3
+lazy-loader==0.5
+librosa==0.9.1
+llvmlite==0.46.0
+markdown-it-py==4.0.0
+MarkupSafe==3.0.3
+mdurl==0.1.2
+more-itertools==10.8.0
+mpmath==1.3.0
+msgpack==1.1.2
+-e git+https://github.com/myshell-ai/OpenVoice@74a1d147b17a8c3092dd5430504bd83ef6c7eb23#egg=MyShell_OpenVoice
+networkx==3.6.1
+numba==0.64.0
+numpy==1.26.4
+packaging==26.0
+platformdirs==4.9.4
+pooch==1.9.0
+proces==0.1.7
+pycparser==3.0
+pydub==0.25.1
+Pygments==2.19.2
+pypinyin==0.55.0
+PyYAML==6.0.3
+requests==2.32.5
+resampy==0.4.3
+rich==14.3.3
+scikit-learn==1.8.0
+scipy==1.17.1
+shellingham==1.5.4
+sounddevice==0.5.5
+soundfile==0.13.1
+soxr==1.0.0
+sympy==1.14.0
+threadpoolctl==3.6.0
+torch==2.10.0
+torchaudio==2.10.0
+tqdm==4.67.3
+typeguard==4.5.1
+typer==0.24.1
+typing_extensions==4.15.0
+Unidecode==1.4.0
+urllib3==2.6.3
+wavmark==0.0.3

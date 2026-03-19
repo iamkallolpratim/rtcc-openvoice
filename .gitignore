@@ -4,3 +4,5 @@ OpenVoice/
 __pycache__/
 rtcc-venv/
 .gradio/
+checkpoints_hf/
+.DS_Store

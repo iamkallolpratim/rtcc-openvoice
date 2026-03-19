@@ -106,7 +106,7 @@ RTCC/
 
 ## Documentation
 
-📖 **[Full Installation Guide & Reference →](docs/INSTALLATION.md)**
+📖 **[Full Installation Guide & Reference →](docs/installation.md)**
 
 Covers prerequisites, step-by-step setup, checkpoint download, CLI reference, all flags, troubleshooting, and Phase 1 details.
 
